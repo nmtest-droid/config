@@ -1,0 +1,60 @@
+[configuration]
+VFS CSV: /mnt/data/unix-shell-emulator/examples/vfs/deep.csv
+Prompt: 'stage3$ '
+Startup script: /mnt/data/unix-shell-emulator/examples/startup-stage3.sh
+stage3$ pwd
+/
+stage3$ ls
+bin  home
+stage3$ cat hello.txt
+shell: cat: hello.txt: no such file
+shell: startup script /mnt/data/unix-shell-emulator/examples/startup-stage3.sh:4: command failed; line skipped
+stage3$ cd docs
+shell: cd: docs: no such file or directory
+shell: startup script /mnt/data/unix-shell-emulator/examples/startup-stage3.sh:5: command failed; line skipped
+stage3$ pwd
+/
+stage3$ ls
+bin  home
+stage3$ cat guide.txt
+shell: cat: guide.txt: no such file
+shell: startup script /mnt/data/unix-shell-emulator/examples/startup-stage3.sh:8: command failed; line skipped
+stage3$ cd ..
+stage3$ cd home/student/projects/demo
+stage3$ pwd
+/home/student/projects/demo
+stage3$ ls
+data  main.py
+stage3$ cat main.py
+print("hello")
+stage3$ cat data/message.txt
+Nested file at depth 5
+stage3$ cd /
+stage3$ ls missing
+shell: ls: missing: no such file or directory
+shell: startup script /mnt/data/unix-shell-emulator/examples/startup-stage3.sh:16: command failed; line skipped
+stage3$ cat missing.txt
+shell: cat: missing.txt: no such file
+shell: startup script /mnt/data/unix-shell-emulator/examples/startup-stage3.sh:17: command failed; line skipped
+stage3$ cat docs
+shell: cat: docs: no such file
+shell: startup script /mnt/data/unix-shell-emulator/examples/startup-stage3.sh:18: command failed; line skipped
+stage3$ cd hello.txt
+shell: cd: hello.txt: no such file or directory
+shell: startup script /mnt/data/unix-shell-emulator/examples/startup-stage3.sh:19: command failed; line skipped
+stage3$ unknown-command
+shell: unknown-command: command not found
+shell: startup script /mnt/data/unix-shell-emulator/examples/startup-stage3.sh:20: command failed; line skipped
+stage3$ cd /
+stage3$ ls one two
+shell: ls: too many arguments (expected 0 or 1)
+shell: startup script /mnt/data/unix-shell-emulator/examples/startup-stage3.sh:22: command failed; line skipped
+stage3$ cat
+shell: cat: expected exactly one file argument
+shell: startup script /mnt/data/unix-shell-emulator/examples/startup-stage3.sh:23: command failed; line skipped
+stage3$ exit extra
+shell: exit: too many arguments (expected none)
+shell: startup script /mnt/data/unix-shell-emulator/examples/startup-stage3.sh:24: command failed; line skipped
+stage3$ pwd
+/
+stage3$ exit

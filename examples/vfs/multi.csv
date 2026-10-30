@@ -1,0 +1,5 @@
+path,type,content_base64
+docs,dir,
+hello.txt,file,SGVsbG8gZnJvbSBWRlMhCg==
+notes.txt,file,U29tZSBub3Rlcy4K
+docs/guide.txt,file,VkZTIGd1aWRlCg==

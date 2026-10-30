@@ -1,0 +1,10 @@
+path,type,content_base64
+home,dir,
+home/student,dir,
+home/student/projects,dir,
+home/student/projects/demo,dir,
+home/student/projects/demo/main.py,file,cHJpbnQoImhlbGxvIikK
+home/student/projects/demo/data,dir,
+home/student/projects/demo/data/message.txt,file,TmVzdGVkIGZpbGUgYXQgZGVwdGggNQo=
+bin,dir,
+bin/tool.txt,file,dG9vbCBwbGFjZWhvbGRlcgo=

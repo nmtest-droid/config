@@ -1,5 +1,10 @@
-# Startup script: successful commands and an unknown command.
-ls -la
-cd /tmp
+# Успешные команды и пример неизвестной команды
+pwd
+ls
+cat hello.txt
 unknown_from_script
-ls /var
+cd docs
+pwd
+ls
+cd /
+exit

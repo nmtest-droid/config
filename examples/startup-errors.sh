@@ -1,4 +1,8 @@
-# Invalid arguments must not stop later commands.
-cd /tmp /var
+# Ошибочные команды пропускаются; выполнение продолжается
+cd docs missing
+ls missing-directory
+cat absent.txt
 exit now
-ls after-errors
+pwd
+ls
+exit
