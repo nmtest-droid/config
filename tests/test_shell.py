@@ -125,6 +125,52 @@ class ShellTests(unittest.TestCase):
         self.assertFalse(self.shell.execute(parse_command('unknown')))
         self.assertIn('command not found', self.err.getvalue())
 
+
+    def test_uniq_default_removes_adjacent_duplicates(self):
+        write_vfs(self.csv_path, [('lines.txt', 'file', b'apple\napple\npear\napple\n')])
+        self.shell.vfs = VirtualFileSystem(self.csv_path)
+        self.assertTrue(self.shell.execute(parse_command('uniq lines.txt')))
+        self.assertEqual(self.out.getvalue(), 'apple\npear\napple\n')
+
+    def test_uniq_count_repeated_and_unique_modes(self):
+        write_vfs(self.csv_path, [('lines.txt', 'file', b'a\na\nb\nc\nc\n')])
+        self.shell.vfs = VirtualFileSystem(self.csv_path)
+        self.assertTrue(self.shell.execute(parse_command('uniq -c lines.txt')))
+        self.assertEqual(self.out.getvalue(), '      2 a\n      1 b\n      2 c\n')
+        self.out.seek(0); self.out.truncate(0)
+        self.assertTrue(self.shell.execute(parse_command('uniq -d lines.txt')))
+        self.assertEqual(self.out.getvalue(), 'a\nc\n')
+        self.out.seek(0); self.out.truncate(0)
+        self.assertTrue(self.shell.execute(parse_command('uniq -u lines.txt')))
+        self.assertEqual(self.out.getvalue(), 'b\n')
+
+    def test_uniq_errors(self):
+        self.assertFalse(self.shell.execute(parse_command('uniq')))
+        self.assertFalse(self.shell.execute(parse_command('uniq -z plain.txt')))
+        self.assertFalse(self.shell.execute(parse_command('uniq absent.txt')))
+        self.assertFalse(self.shell.execute(parse_command('uniq -c -d plain.txt')))
+        self.assertIn('uniq:', self.err.getvalue())
+
+    def test_du_directory_file_and_modes(self):
+        write_vfs(self.csv_path, [('dir', 'dir', b''), ('dir/sub', 'dir', b''),
+                                  ('dir/a.txt', 'file', b'123'), ('dir/sub/b.txt', 'file', b'12345'),
+                                  ('top.txt', 'file', b'12')])
+        self.shell.vfs = VirtualFileSystem(self.csv_path)
+        self.assertTrue(self.shell.execute(parse_command('du -s dir')))
+        self.assertEqual(self.out.getvalue(), '8\tdir\n')
+        self.out.seek(0); self.out.truncate(0)
+        self.assertTrue(self.shell.execute(parse_command('du -a dir')))
+        self.assertEqual(self.out.getvalue(), '3\tdir/a.txt\n5\tdir/sub/b.txt\n5\tdir/sub\n8\tdir\n')
+        self.out.seek(0); self.out.truncate(0)
+        self.assertTrue(self.shell.execute(parse_command('du -h dir/a.txt')))
+        self.assertEqual(self.out.getvalue(), '3B\tdir/a.txt\n')
+
+    def test_du_errors_and_invalid_options(self):
+        self.assertFalse(self.shell.execute(parse_command('du absent')))
+        self.assertFalse(self.shell.execute(parse_command('du -z')))
+        self.assertFalse(self.shell.execute(parse_command('du dir plain.txt')))
+        self.assertIn('du:', self.err.getvalue())
+
     def test_exit(self):
         self.shell.execute(parse_command('exit'))
         self.assertFalse(self.shell.running)

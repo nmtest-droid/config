@@ -1,0 +1,88 @@
+[configuration]
+VFS CSV: /mnt/data/unix-shell-emulator/examples/vfs/multi.csv
+Prompt: 'stage4$ '
+Startup script: /mnt/data/unix-shell-emulator/examples/startup-stage4.sh
+stage4$ pwd
+/
+stage4$ ls
+docs  examples.txt  hello.txt  notes.txt
+stage4$ ls docs
+guide.txt
+stage4$ ls missing
+shell: ls: missing: no such file or directory
+shell: startup script /mnt/data/unix-shell-emulator/examples/startup-stage4.sh:5: command failed; line skipped
+stage4$ ls docs/guide.txt
+shell: ls: docs/guide.txt: not a directory
+shell: startup script /mnt/data/unix-shell-emulator/examples/startup-stage4.sh:6: command failed; line skipped
+stage4$ cd docs
+stage4$ pwd
+/docs
+stage4$ ls
+guide.txt
+stage4$ cd ..
+stage4$ cd missing
+shell: cd: missing: no such file or directory
+shell: startup script /mnt/data/unix-shell-emulator/examples/startup-stage4.sh:11: command failed; line skipped
+stage4$ cd hello.txt
+shell: cd: hello.txt: not a directory
+shell: startup script /mnt/data/unix-shell-emulator/examples/startup-stage4.sh:12: command failed; line skipped
+stage4$ cd home/student/projects/demo
+shell: cd: home/student/projects/demo: no such file or directory
+shell: startup script /mnt/data/unix-shell-emulator/examples/startup-stage4.sh:13: command failed; line skipped
+stage4$ pwd
+/
+stage4$ ls
+docs  examples.txt  hello.txt  notes.txt
+stage4$ cd /
+stage4$ uniq examples.txt
+alpha
+beta
+gamma
+stage4$ uniq -c examples.txt
+      2 alpha
+      1 beta
+      2 gamma
+stage4$ uniq -d examples.txt
+alpha
+gamma
+stage4$ uniq -u examples.txt
+beta
+stage4$ uniq missing.txt
+shell: uniq: missing.txt: no such file
+shell: startup script /mnt/data/unix-shell-emulator/examples/startup-stage4.sh:23: command failed; line skipped
+stage4$ uniq -z examples.txt
+shell: uniq: invalid option '-z'
+shell: startup script /mnt/data/unix-shell-emulator/examples/startup-stage4.sh:24: command failed; line skipped
+stage4$ uniq -c -d examples.txt
+shell: uniq: options -c, -d and -u are mutually exclusive
+shell: startup script /mnt/data/unix-shell-emulator/examples/startup-stage4.sh:25: command failed; line skipped
+stage4$ uniq
+shell: uniq: expected one VFS file and optional mode (-c, -d or -u)
+shell: startup script /mnt/data/unix-shell-emulator/examples/startup-stage4.sh:26: command failed; line skipped
+stage4$  du .
+10	./docs
+67	.
+stage4$ du -a .
+10	./docs/guide.txt
+10	./docs
+29	./examples.txt
+16	./hello.txt
+12	./notes.txt
+67	.
+stage4$ du -h .
+10B	./docs
+67B	.
+stage4$ du -sh docs
+10B	docs
+stage4$ du docs/guide.txt
+10	docs/guide.txt
+stage4$ du missing
+shell: du: missing: no such file or directory
+shell: startup script /mnt/data/unix-shell-emulator/examples/startup-stage4.sh:34: command failed; line skipped
+stage4$ du -z
+shell: du: invalid option '-z'
+shell: startup script /mnt/data/unix-shell-emulator/examples/startup-stage4.sh:35: command failed; line skipped
+stage4$ du docs extra
+shell: du: expected at most one path
+shell: startup script /mnt/data/unix-shell-emulator/examples/startup-stage4.sh:37: command failed; line skipped
+stage4$ exit

@@ -8,6 +8,7 @@ import binascii
 import csv
 import getpass
 import os
+import shlex
 import socket
 import sys
 from dataclasses import dataclass, field
@@ -162,6 +163,36 @@ class VirtualFileSystem:
             raise IsADirectoryError(f"{path}: is a directory")
         return node.data
 
+    def disk_usage(self, path: str = ".") -> tuple[int, list[tuple[str, int, bool]]]:
+        """Return total bytes and post-order entries (path, bytes, is_dir)."""
+        node, resolved = self.resolve(path)
+        if node is None:
+            raise FileNotFoundError(f"{path}: no such file or directory")
+        if node.kind == "file":
+            return len(node.data), [(path, len(node.data), False)]
+
+        entries: list[tuple[str, int, bool]] = []
+
+        def walk(current: VFSNode, current_path: str) -> int:
+            total = 0
+            for child_name in sorted(current.children):
+                child = current.children[child_name]
+                child_path = (current_path.rstrip("/") + "/" + child_name) if current_path != "/" else "/" + child_name
+                if child.kind == "file":
+                    size = len(child.data)
+                    total += size
+                    entries.append((child_path, size, False))
+                else:
+                    size = walk(child, child_path)
+                    total += size
+                    entries.append((child_path, size, True))
+            return total
+
+        display_root = path.rstrip("/") or "/"
+        total = walk(node, display_root)
+        entries.append((path, total, True))
+        return total, entries
+
 
 class Shell:
     def __init__(self, stdin: TextIO | None = None, stdout: TextIO | None = None,
@@ -176,6 +207,118 @@ class Shell:
 
     def _error(self, message: str) -> None:
         print(f"shell: {message}", file=self.stderr)
+
+    @staticmethod
+    def _human_size(size: int) -> str:
+        value = float(size)
+        for unit in ("B", "K", "M", "G", "T"):
+            if value < 1024 or unit == "T":
+                return f"{int(value)}{unit}" if unit == "B" else f"{value:.1f}{unit}"
+            value /= 1024
+        return f"{value:.1f}T"
+
+    def _run_uniq(self, args: list[str]) -> bool:
+        mode = "all"
+        filename: str | None = None
+        index = 0
+        while index < len(args) and args[index].startswith("-"):
+            option = args[index]
+            if option in ("-c", "--count"):
+                if mode != "all":
+                    self._error("uniq: options -c, -d and -u are mutually exclusive")
+                    return False
+                mode = "count"
+            elif option in ("-d", "--repeated"):
+                if mode != "all":
+                    self._error("uniq: options -c, -d and -u are mutually exclusive")
+                    return False
+                mode = "repeated"
+            elif option in ("-u", "--unique"):
+                if mode != "all":
+                    self._error("uniq: options -c, -d and -u are mutually exclusive")
+                    return False
+                mode = "unique"
+            else:
+                self._error(f"uniq: invalid option '{option}'")
+                return False
+            index += 1
+        remaining = args[index:]
+        if len(remaining) != 1:
+            self._error("uniq: expected one VFS file and optional mode (-c, -d or -u)")
+            return False
+        filename = remaining[0]
+        try:
+            content = self.vfs.read_file(filename).decode("utf-8")
+        except (FileNotFoundError, IsADirectoryError) as exc:
+            self._error(f"uniq: {exc}")
+            return False
+        except UnicodeDecodeError:
+            self._error(f"uniq: {filename}: binary file is not supported")
+            return False
+
+        lines = content.splitlines(keepends=True)
+        groups: list[tuple[str, int]] = []
+        for line in lines:
+            key = line.rstrip("\r\n")
+            if groups and groups[-1][0].rstrip("\r\n") == key:
+                groups[-1] = (groups[-1][0], groups[-1][1] + 1)
+            else:
+                groups.append((line, 1))
+        for line, count in groups:
+            if mode == "repeated" and count < 2:
+                continue
+            if mode == "unique" and count != 1:
+                continue
+            if mode == "count":
+                self.stdout.write(f"{count:7d} {line}")
+            else:
+                self.stdout.write(line)
+        return True
+
+    def _run_du(self, args: list[str]) -> bool:
+        show_all = human = summarize = False
+        paths: list[str] = []
+        for arg in args:
+            if arg.startswith("-") and arg != "-":
+                if arg in ("-a", "--all"):
+                    show_all = True
+                elif arg in ("-h", "--human-readable"):
+                    human = True
+                elif arg in ("-s", "--summarize"):
+                    summarize = True
+                elif arg.startswith("-") and len(arg) > 2 and not arg.startswith("--"):
+                    for flag in arg[1:]:
+                        if flag == "a": show_all = True
+                        elif flag == "h": human = True
+                        elif flag == "s": summarize = True
+                        else:
+                            self._error(f"du: invalid option '-{flag}'")
+                            return False
+                else:
+                    self._error(f"du: invalid option '{arg}'")
+                    return False
+            else:
+                paths.append(arg)
+        if len(paths) > 1:
+            self._error("du: expected at most one path")
+            return False
+        path = paths[0] if paths else "."
+        try:
+            total, entries = self.vfs.disk_usage(path)
+        except (FileNotFoundError, NotADirectoryError) as exc:
+            self._error(f"du: {exc}")
+            return False
+
+        if summarize or not entries[-1][2]:
+            entries_to_print = [(path, total, entries[-1][2])]
+        elif show_all:
+            entries_to_print = entries
+        else:
+            entries_to_print = [entry for entry in entries if entry[2]]
+        for entry_path, size, _is_dir in entries_to_print:
+            displayed = self._human_size(size) if human else str(size)
+            print(f"{displayed}\t{entry_path}", file=self.stdout)
+        return True
 
     def execute(self, command: ParsedCommand | None) -> bool:
         if command is None:
@@ -202,6 +345,10 @@ class Shell:
                 self._error(f"cd: {exc}")
                 return False
             return True
+        if name == "uniq":
+            return self._run_uniq(args)
+        if name == "du":
+            return self._run_du(args)
         if name == "pwd":
             if args:
                 self._error("pwd: too many arguments (expected none)")
