@@ -1,0 +1,77 @@
+[configuration]
+VFS CSV: /mnt/data/unix-shell-emulator/examples/vfs/multi.csv
+Prompt: 'stage5$ '
+Startup script: /mnt/data/unix-shell-emulator/examples/startup-stage5.sh
+stage5$ pwd
+/
+stage5$ ls
+docs  examples.txt  hello.txt  notes.txt
+stage5$ ls -l
+d	root	root	docs
+-	root	root	examples.txt
+-	root	root	hello.txt
+-	root	root	notes.txt
+stage5$ touch stage5-new.txt
+stage5$ touch docs/stage5-note.txt docs/stage5-empty.txt
+stage5$ ls -l
+d	root	root	docs
+-	root	root	examples.txt
+-	root	root	hello.txt
+-	root	root	notes.txt
+-	root	root	stage5-new.txt
+stage5$ cat stage5-new.txt
+
+stage5$ touch hello.txt
+stage5$ touch -c not-created.txt
+stage5$ touch /docs/stage5-absolute.txt
+stage5$ ls -l docs
+-	root	root	guide.txt
+-	root	root	stage5-absolute.txt
+-	root	root	stage5-empty.txt
+-	root	root	stage5-note.txt
+stage5$ touch
+shell: touch: expected at least one path
+shell: startup script /mnt/data/unix-shell-emulator/examples/startup-stage5.sh:19: command failed; line skipped
+stage5$ touch -z invalid.txt
+shell: touch: invalid option '-z'
+shell: startup script /mnt/data/unix-shell-emulator/examples/startup-stage5.sh:20: command failed; line skipped
+stage5$ touch missing-dir/file.txt
+shell: touch: missing-dir/file.txt: parent directory does not exist
+shell: startup script /mnt/data/unix-shell-emulator/examples/startup-stage5.sh:21: command failed; line skipped
+stage5$ touch docs/guide.txt/child.txt
+shell: touch: docs/guide.txt/child.txt: parent component is not a directory
+shell: startup script /mnt/data/unix-shell-emulator/examples/startup-stage5.sh:22: command failed; line skipped
+stage5$ chown alice stage5-new.txt
+stage5$ chown :students stage5-new.txt
+stage5$ chown bob:developers docs/stage5-note.txt
+stage5$ ls -l
+d	root	root	docs
+-	root	root	examples.txt
+-	root	root	hello.txt
+-	root	root	notes.txt
+-	alice	students	stage5-new.txt
+stage5$ chown -R teamlead:project docs
+stage5$ ls -l docs
+-	teamlead	project	guide.txt
+-	teamlead	project	stage5-absolute.txt
+-	teamlead	project	stage5-empty.txt
+-	teamlead	project	stage5-note.txt
+stage5$ chown root:wheel /hello.txt
+stage5$ chown
+shell: chown: expected OWNER[:GROUP] and at least one path
+shell: startup script /mnt/data/unix-shell-emulator/examples/startup-stage5.sh:36: command failed; line skipped
+stage5$ chown : stage5-new.txt
+shell: chown: owner or group must be specified
+shell: startup script /mnt/data/unix-shell-emulator/examples/startup-stage5.sh:37: command failed; line skipped
+stage5$ chown a:b:c stage5-new.txt
+shell: chown: invalid owner/group 'a:b:c'
+shell: startup script /mnt/data/unix-shell-emulator/examples/startup-stage5.sh:38: command failed; line skipped
+stage5$ chown -z alice stage5-new.txt
+shell: chown: invalid option '-z'
+shell: startup script /mnt/data/unix-shell-emulator/examples/startup-stage5.sh:39: command failed; line skipped
+stage5$ chown alice absent.txt
+shell: chown: absent.txt: no such file or directory
+shell: startup script /mnt/data/unix-shell-emulator/examples/startup-stage5.sh:40: command failed; line skipped
+stage5$ pwd
+/
+stage5$ exit

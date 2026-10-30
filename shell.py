@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""UNIX-like shell emulator with an in-memory CSV-backed VFS."""
+
 from __future__ import annotations
 
 import argparse
@@ -11,6 +11,7 @@ import os
 import shlex
 import socket
 import sys
+import time
 from dataclasses import dataclass, field
 from pathlib import Path, PurePosixPath
 from typing import TextIO
@@ -33,11 +34,22 @@ def make_prompt(username: str | None = None, hostname: str | None = None,
     hostname = hostname if hostname is not None else socket.gethostname()
     cwd = cwd if cwd is not None else os.getcwd()
     home = home if home is not None else os.path.expanduser("~")
+
     try:
         rel = os.path.relpath(cwd, home)
-        shown = "~" if rel == "." else (cwd if rel == ".." or rel.startswith(".." + os.sep) else os.path.join("~", rel))
+        rel = rel.replace("\\", "/")
+        cwd_display = cwd.replace("\\", "/")
+
+        if rel == ".":
+            shown = "~"
+        elif rel == ".." or rel.startswith("../"):
+            shown = cwd_display
+        else:
+            shown = "~/" + rel
+
     except ValueError:
-        shown = cwd
+        shown = cwd.replace("\\", "/")
+
     return f"{username}@{hostname}:{shown}$ "
 
 
@@ -47,6 +59,9 @@ class VFSNode:
     kind: str
     data: bytes = b""
     children: dict[str, "VFSNode"] = field(default_factory=dict)
+    owner: str = "root"
+    group: str = "root"
+    modified_at: float = field(default_factory=time.time)
 
 
 class VFSLoadError(ValueError):
@@ -163,6 +178,44 @@ class VirtualFileSystem:
             raise IsADirectoryError(f"{path}: is a directory")
         return node.data
 
+    def touch(self, path: str, *, create: bool = True) -> bool:
+        """Update an entry timestamp or create an empty file, entirely in memory."""
+        node, _ = self.resolve(path)
+        if node is not None:
+            node.modified_at = time.time()
+            return False
+        if not create:
+            return False
+        parts = self._parts(path, self.cwd)
+        if not parts:
+            raise IsADirectoryError(f"{path}: is a directory")
+        parent = self.root
+        for part in parts[:-1]:
+            if part not in parent.children:
+                raise FileNotFoundError(f"{path}: parent directory does not exist")
+            parent = parent.children[part]
+            if parent.kind != "dir":
+                raise NotADirectoryError(f"{path}: parent component is not a directory")
+        name = parts[-1]
+        parent.children[name] = VFSNode(name, "file", b"")
+        return True
+
+    def change_owner(self, path: str, owner: str | None, group: str | None, *, recursive: bool = False) -> None:
+        node, _ = self.resolve(path)
+        if node is None:
+            raise FileNotFoundError(f"{path}: no such file or directory")
+
+        def apply(current: VFSNode) -> None:
+            if owner is not None:
+                current.owner = owner
+            if group is not None:
+                current.group = group
+            if recursive and current.kind == "dir":
+                for child in current.children.values():
+                    apply(child)
+
+        apply(node)
+
     def disk_usage(self, path: str = ".") -> tuple[int, list[tuple[str, int, bool]]]:
         """Return total bytes and post-order entries (path, bytes, is_dir)."""
         node, resolved = self.resolve(path)
@@ -203,7 +256,7 @@ class Shell:
         self.stderr = stderr if stderr is not None else sys.stderr
         self.running = True
         self.vfs = vfs
-        self.prompt = prompt if prompt is not None else make_prompt()
+        self.custom_prompt = prompt
 
     def _error(self, message: str) -> None:
         print(f"shell: {message}", file=self.stderr)
@@ -320,20 +373,99 @@ class Shell:
             print(f"{displayed}\t{entry_path}", file=self.stdout)
         return True
 
+    def _run_touch(self, args: list[str]) -> bool:
+        no_create = False
+        paths: list[str] = []
+        for arg in args:
+            if arg in ("-c", "--no-create"):
+                no_create = True
+            elif arg.startswith("-") and arg != "-":
+                self._error(f"touch: invalid option '{arg}'")
+                return False
+            else:
+                paths.append(arg)
+        if not paths:
+            self._error("touch: expected at least one path")
+            return False
+        for path in paths:
+            try:
+                self.vfs.touch(path, create=not no_create)
+            except (FileNotFoundError, NotADirectoryError, IsADirectoryError) as exc:
+                self._error(f"touch: {exc}")
+                return False
+        return True
+
+    def _run_chown(self, args: list[str]) -> bool:
+        recursive = False
+        remaining: list[str] = []
+        for arg in args:
+            if arg in ("-R", "--recursive"):
+                recursive = True
+            elif arg.startswith("-") and arg != "-":
+                self._error(f"chown: invalid option '{arg}'")
+                return False
+            else:
+                remaining.append(arg)
+        if len(remaining) < 2:
+            self._error("chown: expected OWNER[:GROUP] and at least one path")
+            return False
+        spec, *paths = remaining
+        if spec.count(":") > 1:
+            self._error(f"chown: invalid owner/group '{spec}'")
+            return False
+        if ":" in spec:
+            owner_text, group_text = spec.split(":", 1)
+            owner = owner_text or None
+            group = group_text or None
+            if owner is None and group is None:
+                self._error("chown: owner or group must be specified")
+                return False
+        else:
+            owner, group = spec, None
+        for path in paths:
+            try:
+                self.vfs.change_owner(path, owner, group, recursive=recursive)
+            except FileNotFoundError as exc:
+                self._error(f"chown: {exc}")
+                return False
+        return True
+
     def execute(self, command: ParsedCommand | None) -> bool:
         if command is None:
             return True
         name, args = command.name, command.args
         if name == "ls":
-            if len(args) > 1:
-                self._error("ls: too many arguments (expected 0 or 1)")
+            long_format = False
+            paths = []
+            for arg in args:
+                if arg in ("-l", "--long"):
+                    long_format = True
+                elif arg.startswith("-") and arg != "-":
+                    self._error(f"ls: invalid option '{arg}'")
+                    return False
+                else:
+                    paths.append(arg)
+            if len(paths) > 1:
+                self._error("ls: too many arguments (expected at most one path)")
                 return False
+            target = paths[0] if paths else "."
             try:
-                entries = self.vfs.list_dir(args[0] if args else ".")
+                node, resolved = self.vfs.resolve(target)
+                if node is None:
+                    raise FileNotFoundError(f"{target}: no such file or directory")
+                if node.kind == "file":
+                    entries = [(node.name, node)]
+                else:
+                    entries = [(name, node.children[name]) for name in sorted(node.children)]
+                if long_format:
+                    for entry_name, entry in entries:
+                        kind = "d" if entry.kind == "dir" else "-"
+                        print(f"{kind}\t{entry.owner}\t{entry.group}\t{entry_name}", file=self.stdout)
+                else:
+                    print("  ".join(entry_name for entry_name, _entry in entries), file=self.stdout)
             except (FileNotFoundError, NotADirectoryError) as exc:
                 self._error(f"ls: {exc}")
                 return False
-            print("  ".join(entries), file=self.stdout)
             return True
         if name == "cd":
             if len(args) > 1:
@@ -349,6 +481,10 @@ class Shell:
             return self._run_uniq(args)
         if name == "du":
             return self._run_du(args)
+        if name == "touch":
+            return self._run_touch(args)
+        if name == "chown":
+            return self._run_chown(args)
         if name == "pwd":
             if args:
                 self._error("pwd: too many arguments (expected none)")
@@ -390,7 +526,7 @@ class Shell:
                     text = raw_line.rstrip("\r\n")
                     if not text.strip() or text.lstrip().startswith("#"):
                         continue
-                    self.stdout.write(self.prompt + text + "\n")
+                    self.stdout.write(self._get_prompt() + text + "\n")
                     self.stdout.flush()
                     if not self.execute(parse_command(text)):
                         self._error(f"startup script {path}:{line_number}: command failed; line skipped")
@@ -399,7 +535,7 @@ class Shell:
 
     def run(self) -> int:
         while self.running:
-            self.stdout.write(self.prompt)
+            self.stdout.write(self._get_prompt())
             self.stdout.flush()
             line = self.stdin.readline()
             if line == "":
@@ -407,6 +543,14 @@ class Shell:
                 break
             self.execute(parse_command(line))
         return 0
+
+    def _get_prompt(self) -> str:
+        if self.custom_prompt is not None:
+            return self.custom_prompt
+
+        username = getpass.getuser()
+        hostname = socket.gethostname()
+        return f"{username}@{hostname}:{self.vfs.cwd}$ "
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -421,11 +565,11 @@ def build_parser() -> argparse.ArgumentParser:
 
 def main(argv: list[str] | None = None) -> int:
     args = build_parser().parse_args(argv)
-    prompt = args.prompt if args.prompt is not None else make_prompt()
+    prompt = args.prompt
     startup_script = Path(args.startup_script).expanduser().resolve() if args.startup_script else None
     print("[configuration]", file=sys.stderr)
     print(f"VFS CSV: {Path(args.vfs_path).expanduser().resolve()}", file=sys.stderr)
-    print(f"Prompt: {prompt!r}", file=sys.stderr)
+    print(f"Prompt: {prompt if prompt is not None else '(dynamic VFS path)'}", file=sys.stderr)
     print(f"Startup script: {startup_script if startup_script else '(not set)'}", file=sys.stderr)
     try:
         vfs = VirtualFileSystem(args.vfs_path)
