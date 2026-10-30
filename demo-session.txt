@@ -1,0 +1,24 @@
+Демонстрация этапа 2 (сокращённая запись вывода; конфигурация печатается в stderr).
+
+$ python3 shell.py --vfs . --prompt 'demo@vm:/$ ' --startup-script examples/startup-errors.sh
+[configuration]
+VFS path: /mnt/data/unix-shell-emulator
+Prompt: 'demo@vm:/$ '
+Startup script: /mnt/data/unix-shell-emulator/examples/startup-errors.sh
+demo@vm:/$ cd /tmp /var
+shell: cd: too many arguments (expected 0 or 1)
+shell: startup script /mnt/data/unix-shell-emulator/examples/startup-errors.sh:2: command failed; line skipped
+demo@vm:/$ exit now
+shell: exit: too many arguments (expected none)
+shell: startup script /mnt/data/unix-shell-emulator/examples/startup-errors.sh:3: command failed; line skipped
+demo@vm:/$ ls after-errors
+ls after-errors
+demo@vm:/$
+
+Проверки параметров командной строки:
+$ bash scripts/test-defaults.sh
+$ bash scripts/test-vfs.sh
+$ bash scripts/test-prompt.sh
+$ bash scripts/test-startup-script.sh
+$ bash scripts/test-all-options.sh
+Все пять скриптов завершаются с кодом 0.
