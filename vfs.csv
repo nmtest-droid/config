@@ -1,0 +1,8 @@
+path,type,content_base64
+docs,dir,
+docs/readme.txt,file,VmlydHVhbCBmaWxlIHN5c3RlbSBkZW1vClRoaXMgZmlsZSBpcyBzdG9yZWQgaW4gbWVtb3J5Lgo=
+docs/repeated.txt,file,YXBwbGUKYXBwbGUKYmFuYW5hCmNoZXJyeQpjaGVycnkKY2hlcnJ5Cg==
+docs/projects,dir,
+docs/projects/plan.txt,file,UHJvamVjdCBwbGFuClRhc2tzIGFyZSBzdG9yZWQgaW4gdGhlIHZpcnR1YWwgZmlsZSBzeXN0ZW0uCg==
+hello.txt,file,SGVsbG8gZnJvbSB0aGUgdmlydHVhbCBmaWxlIHN5c3RlbSEK
+notes.txt,file,VGhlc2UgYXJlIHNhbXBsZSBub3Rlcy4K
