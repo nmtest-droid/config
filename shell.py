@@ -555,8 +555,8 @@ class Shell:
 
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description="UNIX-like shell emulator with CSV-backed in-memory VFS")
-    parser.add_argument("-v", "--vfs", "--vfs-path", dest="vfs_path", default="examples/vfs/multi.csv",
-                        metavar="CSV", help="CSV file describing VFS (default: examples/vfs/multi.csv)")
+    parser.add_argument("-v", "--vfs", "--vfs-path", dest="vfs_path", default="vfs.csv",
+                        metavar="CSV", help="CSV file describing VFS (default: vfs.csv)")
     parser.add_argument("-p", "--prompt", default=None, metavar="TEXT", help="custom REPL prompt")
     parser.add_argument("-s", "--startup-script", "--script", dest="startup_script", default=None,
                         metavar="PATH", help="startup script containing emulator commands")
